@@ -7,6 +7,7 @@ import water.util.Log;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.*;
@@ -30,7 +31,6 @@ public class RabitTrackerH2O implements IRabitTracker {
         }
 
         this.workers = workers;
-
         Log.debug("Rabit tracker started on port ", this.port);
     }
 
@@ -78,10 +78,11 @@ public class RabitTrackerH2O implements IRabitTracker {
         if(null != this.trackerThread) {
             this.trackerThread.interrupt();
             this.trackerThread = null;
+
             try {
                 this.sock.close();
             } catch (IOException e) {
-                throw new RuntimeException("Failed to close Rabit tracker socket.", e);
+                throw new RuntimeException("Failed to close Rabit tracker socket.f", e);
             } finally {
                 this.port = 9091;
             }
@@ -100,6 +101,7 @@ public class RabitTrackerH2O implements IRabitTracker {
             this.tracker = tracker;
         }
 
+
         private static final String PRINT_CMD = "print";
         private static final String SHUTDOWN_CMD = "shutdown";
         private static final String START_CMD = "start";
@@ -113,9 +115,9 @@ public class RabitTrackerH2O implements IRabitTracker {
             List<RabitWorker> pending = new ArrayList<>();
             Queue<Integer> todoNodes = new ArrayDeque<>(tracker.workers);
             while (!interrupted() && shutdown.size() != tracker.workers) {
-                try {
-                    SocketChannel channel = tracker.sock.accept();
-                    RabitWorker worker = new RabitWorker(channel);
+                try{
+                    final SocketChannel channel = tracker.sock.accept();
+                    final RabitWorker worker = new RabitWorker(channel);
 
                     if (PRINT_CMD.equals(worker.cmd)) {
                         String msg = worker.receiver().getStr();
@@ -125,6 +127,7 @@ public class RabitTrackerH2O implements IRabitTracker {
                         assert worker.rank >= 0 && !shutdown.contains(worker.rank);
                         assert !waitConn.containsKey(worker);
                         shutdown.add(worker.rank);
+                        channel.close();
                         Log.debug("Received ", worker.cmd, " signal from ", worker.rank);
                         continue;
                     }
@@ -177,7 +180,8 @@ public class RabitTrackerH2O implements IRabitTracker {
                         }
                     }
                 } catch (IOException e) {
-                    Log.debug("Exception in Rabit tracker.", e);
+                    Log.info("Exception in Rabit tracker.", e);
+                    Log.err(e);
                 }
             }
             Log.debug("All Rabit nodes finished.");
